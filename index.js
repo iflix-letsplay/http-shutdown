@@ -11,7 +11,7 @@ exports = module.exports = addShutdown;
  * Adds shutdown functionaility to the `http.Server` object
  * @param {http.Server} server The server to add shutdown functionaility to
  */
-function addShutdown(server) {
+function addShutdown(server, logger) {
   var connections = {};
   var isShuttingDown = false;
   var connectionCounter = 0;
@@ -20,6 +20,8 @@ function addShutdown(server) {
     if (force || (socket._isIdle && isShuttingDown)) {
       socket.destroy();
       delete connections[socket._connectionId];
+    } else if (!socket._isIdle && isShuttingDown) {
+      logger.info('Server is shutting down but socket is not idle!')
     }
   };
 
@@ -50,17 +52,20 @@ function addShutdown(server) {
 
   function shutdown(force, cb) {
     isShuttingDown = true;
+
+    logger.info('Closing server to prevent receving new connections');
     server.close(function(err) {
       if (cb) {
+        logger.info('Server is closed. callback will be called on nextTick phase.')
         process.nextTick(function() {
-          console.log('Number of sockets right before exit', Object.keys(connections).length);
+          logger.info('Number of sockets right before exit', Object.keys(connections).length);
           cb(err);
         });
       }
     });
 
-    let busySockets = Object.keys(connections).filter(k => connections[key]._isIdle===false).length;
-    console.log('Number of busy sockets when shutting down', busySockets);
+    let busySockets = Object.keys(connections).filter(key => connections[key]._isIdle === false).length;
+    logger.info('Number of busy sockets when shutting down', busySockets);
 
     Object.keys(connections).forEach(function(key) {
       destroy(connections[key], force);
