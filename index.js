@@ -12,6 +12,7 @@ exports = module.exports = addShutdown;
  * @param {http.Server} server The server to add shutdown functionaility to
  */
 function addShutdown(server, logger) {
+  logger = logger || console
   var connections = {};
   var isShuttingDown = false;
   var connectionCounter = 0;
@@ -20,10 +21,38 @@ function addShutdown(server, logger) {
     if (force || (socket._isIdle && isShuttingDown)) {
       socket.destroy();
       delete connections[socket._connectionId];
+      logger.info(`Idle socket destroyed. remained=${Object.keys(connections).length}`)
     } else if (!socket._isIdle && isShuttingDown) {
       logger.info('Server is shutting down but socket is not idle!')
     }
   };
+
+  function destroyAllSockets(force, callback, attempt) {
+    attempt = attempt || 1
+    let connectionKeys = Object.keys(connections)
+
+    let busySockets = connectionKeys.filter(key => connections[key]._isIdle === false).length;
+    logger.info(`Connection stats when shutting down: total:${connectionKeys.length}, busy:${busySockets}`);
+
+    connectionKeys.forEach(function(key) {
+      destroy(connections[key], force);
+    });
+
+    let remainingSockets = Object.keys(connections).length
+    if (remainingSockets) {
+      if (attempt > 75) {
+        logger.info(`Attempted 75 times for 15second to end sockets but still ${remainingSockets} sockets are open!`);
+        return callback();
+      }
+
+      return setTimeout(() => {
+        return destroyAllSockets(force, callback, attempt + 1);
+      }, 200)
+    }
+
+    logger.info(`All connection are destroyed either safely or by force=${force}! remainingSockets=${remainingSockets}`)
+    return callback();
+  }
 
   function onConnection(socket) {
     var id = connectionCounter++;
@@ -52,24 +81,29 @@ function addShutdown(server, logger) {
 
   function shutdown(force, cb) {
     isShuttingDown = true;
+    cb = cb || function(){}
 
-    logger.info('Closing server to prevent receving new connections');
-    server.close(function(err) {
-      if (cb) {
-        logger.info('Server is closed. callback will be called on nextTick phase.')
-        process.nextTick(function() {
-          logger.info(`Number of sockets right before exit: ${Object.keys(connections).length}`);
-          cb(err);
+    function closeServer() {
+      logger.info('Closing server to prevent receving new connections');
+      return new Promise((resolve, reject) => {
+        server.close(err => {
+          logger.info('Server is closed.');
+          return err ? reject(err) : resolve();
         });
-      }
-    });
+      });
+    }
 
-    let busySockets = Object.keys(connections).filter(key => connections[key]._isIdle === false).length;
-    logger.info(`Number of busy sockets when shutting down: ${busySockets}`);
+    function closeConnections() {
+      logger.info('Closing existing connections');
+      return new Promise((resolve, reject) => {
+        destroyAllSockets(force, () => {
+          logger.info(`Number of sockets right before exit: ${Object.keys(connections).length}`);
+          return resolve();
+        });
+      });
+    }
 
-    Object.keys(connections).forEach(function(key) {
-      destroy(connections[key], force);
-    });
+    return Promise.all([closeServer(), closeConnections()]).then(() => cb()).catch(cb);
   };
 
   server.shutdown = function(cb) {
