@@ -58,14 +58,14 @@ function addShutdown(server, logger) {
       if (cb) {
         logger.info('Server is closed. callback will be called on nextTick phase.')
         process.nextTick(function() {
-          logger.info('Number of sockets right before exit', Object.keys(connections).length);
+          logger.info(`Number of sockets right before exit: ${Object.keys(connections).length}`);
           cb(err);
         });
       }
     });
 
     let busySockets = Object.keys(connections).filter(key => connections[key]._isIdle === false).length;
-    logger.info('Number of busy sockets when shutting down', busySockets);
+    logger.info(`Number of busy sockets when shutting down: ${busySockets}`);
 
     Object.keys(connections).forEach(function(key) {
       destroy(connections[key], force);

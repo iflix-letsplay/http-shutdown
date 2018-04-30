@@ -1,6 +1,6 @@
 {
   "name": "@iflix/node-shutdown",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Gracefully shutdown a running HTTP server.",
   "main": "index.js",
   "scripts": {
