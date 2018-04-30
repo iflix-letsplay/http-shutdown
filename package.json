@@ -1,6 +1,6 @@
 {
   "name": "node-shutdown",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Gracefully shutdown a running HTTP server.",
   "main": "index.js",
   "scripts": {

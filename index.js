@@ -34,25 +34,33 @@ function addShutdown(server) {
     });
   };
 
-  server.on('request', function(req, res) {
-    req.socket._isIdle = false;
+  function onRequest(req, res) {
+    let socket = req.socket
+    socket._isIdle = false;
 
     res.on('finish', function() {
-      req.socket._isIdle = true;
-      destroy(req.socket);
+      socket._isIdle = true;
+      destroy(socket);
     });
-  });
+  };
 
   server.on('connection', onConnection);
   server.on('secureConnection', onConnection);
+  server.on('request', onRequest);
 
   function shutdown(force, cb) {
     isShuttingDown = true;
     server.close(function(err) {
       if (cb) {
-        process.nextTick(function() { cb(err); });
+        process.nextTick(function() {
+          console.log('Number of sockets right before exit', Object.keys(connections).length);
+          cb(err);
+        });
       }
     });
+
+    let busySockets = Object.keys(connections).filter(k => connections[key]._isIdle===false).length;
+    console.log('Number of busy sockets when shutting down', busySockets);
 
     Object.keys(connections).forEach(function(key) {
       destroy(connections[key], force);
