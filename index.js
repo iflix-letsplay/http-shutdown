@@ -19,7 +19,7 @@ function addShutdown(server, logger) {
 
   function destroy(socket, force) {
     if (force || (socket._isIdle && isShuttingDown)) {
-      socket.destroy();
+      socket.destroySoon();
       delete connections[socket._connectionId];
       logger.info(`Idle socket destroyed. remained=${Object.keys(connections).length}`)
     } else if (!socket._isIdle && isShuttingDown) {
